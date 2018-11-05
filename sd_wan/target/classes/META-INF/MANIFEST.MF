@@ -1,0 +1,29 @@
+Manifest-Version: 1.0
+Bnd-LastModified: 1541388498145
+Build-Jdk: 1.8.0_181
+Built-By: ubuntu
+Bundle-Description: SD WAN application
+Bundle-ManifestVersion: 2
+Bundle-Name: sd_wan
+Bundle-SymbolicName: org.sd_wan.app.sd_wan
+Bundle-Version: 1.10.0
+Created-By: Apache Maven Bundle Plugin
+Export-Package: org.sd_wan.app;uses:="org.onlab.packet,org.onosproject.c
+ ore,org.onosproject.net,org.onosproject.net.device,org.onosproject.net.
+ flow,org.onosproject.net.host,org.onosproject.net.link,org.onosproject.
+ net.packet,org.onosproject.ui,org.sd_wan.apps";version="1.10.0",org.sd_
+ wan.apps;uses:="org.onosproject.net,org.sd_wan.app";version="1.10.0"
+Import-Package: com.fasterxml.jackson.databind;version="[2.9,3)",com.fas
+ terxml.jackson.databind.node;version="[2.9,3)",com.google.common.collec
+ t;version="[22.0,23)",org.onlab.packet;version="[1.14,2)",org.onosproje
+ ct.core;version="[1.14,2)",org.onosproject.event;version="[1.14,2)",org
+ .onosproject.net;version="[1.14,2)",org.onosproject.net.device;version=
+ "[1.14,2)",org.onosproject.net.flow;version="[1.14,2)",org.onosproject.
+ net.host;version="[1.14,2)",org.onosproject.net.link;version="[1.14,2)"
+ ,org.onosproject.net.packet;version="[1.14,2)",org.onosproject.ui;versi
+ on="[1.14,2)",org.sd_wan.app,org.sd_wan.apps,org.slf4j;version="[1.7,2)
+ "
+Require-Capability: osgi.ee;filter:="(&(osgi.ee=JavaSE)(version=1.8))"
+Service-Component: OSGI-INF/org.sd_wan.app.SDWanManager.xml,OSGI-INF/org
+ .sd_wan.app.AppUiComponent.xml
+Tool: Bnd-3.0.0.201509101326

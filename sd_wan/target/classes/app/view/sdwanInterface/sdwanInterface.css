@@ -1,0 +1,78 @@
+/* css for sample app custom view */
+
+#ov-sdwan-interface {
+    padding: 20px;
+}
+.light #ov-sdwan-interface {
+    color: navy;
+}
+.dark #ov-sdwan-interface {
+    color: #88f;
+}
+
+#ov-sdwan-interface .gateway-panel {
+    margin: 10px;
+    width: 420px;
+    overflow: auto;
+}
+
+#ov-sdwan-interface table, th, td {
+    border: 1px solid black;
+    border-collapse: collapse;
+    width: 1200px;
+}
+
+#gatewayTable tr td:nth-child(6) {
+    border: 0px;
+}
+
+
+td, th {
+    width: 200px;
+    padding: 5px;
+    padding-left:15px;
+
+}
+
+#ov-sdwan-interface .refresh-panel {
+    float: left;
+    width: 223px;
+}
+
+#ov-sdwan-interface .new-gateway-panel {
+    float: left;
+    padding-left: 20px;
+    width: 176.5px;
+}
+
+.light #ov-sdwan-interface .gateway-panel {
+    background-color: #ccf;
+}
+.dark #ov-sdwan-interface .gateway-panel {
+    background-color: #444;
+}
+
+#ov-sdwan-interface .refresh-button {
+    cursor: pointer;
+    padding: 4px;
+    text-align: center;
+}
+
+.light #ov-sdwan-interface .refresh-button {
+    color: white;
+    background-color: #99d;
+}
+.dark #ov-sdwan-interface .refresh-button {
+    color: black;
+    background-color: #aaa;
+}
+
+#ov-sdwan-interface .number {
+    font-size: 140%;
+    text-align: right;
+}
+
+#ov-sdwan-interface .quote {
+    margin: 10px 20px;
+    font-style: italic;
+}

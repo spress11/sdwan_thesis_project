@@ -1,0 +1,51 @@
+<!-- partial HTML -->
+<div id="ov-sdwan-interface">
+    <div class="gateway-panel">
+        <div class="refresh-panel">
+            <select id="gatewayList" class="gateway-select" ng-model="confirmed" ng-change="requestInterfaces()"></select>
+            <div class="refresh-button" ng-click="getData()">
+                <br>Refresh
+            </div>
+        </div>
+        <div class="new-gateway-panel">
+            <input type="text" id="newGateway">
+            <div class="refresh-button" ng-click="addGateway()">
+                Add Gateway by Device ID
+            </div>
+        </div>
+    </div>
+    <div id="gatewayInterfacesPanel" class="gateway-interfaces-panel">
+        <h1 id="gatewayHeader"></h1>
+        <table id="gatewayTable" style="display:none;">
+            <tr>
+                <th>Interface name</th>
+                <th>Port Number</th>
+                <th>Mac Address</th>
+                <th>IP Address</th>
+                <th>Bandwidth (Mbit/s)</th>
+            </tr>
+            <tr>
+                <td><input type="text" name="Interface Name" id="intfName"></td>
+                <td><input type="text" name="Port Number" id="intfPort"></td>
+                <td><input type="text" name="Mac Address" id="intfMac"></td>
+                <td><input type="text" name="IP" id="intfIp"></td>
+                <td><input type="text" name="Bandwidth" id="intfBandwidth"></td>
+                <td><input type="button" name="Add Interface" value="Add New Interface" ng-click="addInterface()"></td>
+            </tr>
+        </table>
+        <br>
+        <h2 id="statisticsHeader" style="display:none;">Gateway Interface Statistics</h2>
+        <table id="statisticsTable" style="display:none;">
+            <tr>
+                <th>Interface name</th>
+                <th>Port Number</th>
+                <th>Enabled</th>
+                <th>Mbits/Second</th>
+                <th>Total bytes</th>
+                <th>Packet Errors</th>
+                <th>Packets Dropped</th>
+            </tr>
+        </table>
+
+    </div>
+</div>

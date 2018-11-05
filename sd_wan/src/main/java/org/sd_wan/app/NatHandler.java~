@@ -1,0 +1,333 @@
+package org.sd_wan.app;
+
+
+import org.apache.felix.scr.annotations.Reference;
+import org.apache.felix.scr.annotations.ReferenceCardinality;
+import org.onlab.packet.*;
+import org.onosproject.core.ApplicationId;
+import org.onosproject.net.DeviceId;
+import org.onosproject.net.Host;
+import org.onosproject.net.PortNumber;
+import org.onosproject.net.flow.*;
+import org.onosproject.net.flowobjective.DefaultForwardingObjective;
+import org.onosproject.net.flowobjective.FlowObjectiveService;
+
+import java.util.*;
+
+public class NatHandler {
+
+    final private DeviceId mainSwitch = DeviceId.deviceId("of:0000000000000001");
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected FlowObjectiveService flowObjectiveService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected FlowRuleService flowRuleService;
+
+    private Map<String, InterfaceTable> interfaceTableMap;
+    private Map<NatAddrPortPair, NatAddrPortPair> NatTable = new HashMap<NatAddrPortPair, NatAddrPortPair>();
+
+    private List<TpPort> currentPorts = new ArrayList<TpPort>();
+    private TpPort nextPort = TpPort.tpPort(TpPort.MIN_PORT);
+
+    private ApplicationId appId;
+
+    public NatHandler(ApplicationId appId) {
+        this.appId = appId;
+        interfaceTableMap = new HashMap<>();
+    }
+
+    /**
+     * Gets the nextPort value while also setting the new nextPort value
+     * @return current nextPort value
+     */
+    private TpPort nextPort() {
+        TpPort oldNextPort = nextPort;
+
+        //find and assign the next nextPort value
+        TpPort newNextPort = null;
+        int i = nextPort.toInt() + 1;
+        while (newNextPort == null && i <= TpPort.MAX_PORT) {
+            if (!currentPorts.contains(TpPort.tpPort(i))) {
+                //next nextPort value found
+                newNextPort = TpPort.tpPort(i);
+                nextPort = newNextPort;
+                return oldNextPort;
+            }
+            i++;
+        }
+        //no new port available
+        return null;
+    }
+
+    private void removeRule(FlowRule flowRule) {
+        //TODO: remove rule
+        /*
+		//Need to consider that this will get called twice for a single NAT as each NAT has 2 rules (ingoing, outgoing)
+		//How to know if rule is outgoing or ingoing?
+		currentPorts.remove(TpPort of removed rule);
+		NatTable.remove(new NatAddrPortPair(VALUES));
+		nextPort = (TpPort of removed rule);
+
+		*/
+    }
+
+    /**
+     * Makes the NAT rules to translate from host to edge router and back
+     *
+     * @param srcIP         The srcIP address / the host's internal IP address
+     * @param srcPort       The host's srcPort for the connection
+     * @param protocol      The protocol of the connection
+     * @param interfaceAddr The outward facing IP address of the selected interface
+     * @return An array of two flow rules to apply, 0th is for host to edge(outgoing) NAT, 1st is for edge to host (incoming) NAT
+     */
+    public FlowRule[] makeNATRules(IpAddress dstIP, int dstPort, IpAddress srcIP, int srcPort, byte protocol, IpAddress interfaceAddr) {
+        NatAddrPortPair inTranslationPair = new NatAddrPortPair(srcIP, srcPort, protocol);
+
+        // TODO: Handle if nextPort == null?
+        NatAddrPortPair outTranslationPair = new NatAddrPortPair(interfaceAddr, nextPort().toInt(), protocol);
+
+        NatTable.put(inTranslationPair, outTranslationPair);
+
+        //Selector and treatment for translating outgoing traffic from the host
+        TrafficSelector.Builder outSelector = DefaultTrafficSelector.builder();
+        TrafficTreatment.Builder outTreatment = DefaultTrafficTreatment.builder();
+
+        //Selector and treatment for translating incoming traffic from the Destination
+        TrafficSelector.Builder inSelector = DefaultTrafficSelector.builder();
+        TrafficTreatment.Builder inTreatment = DefaultTrafficTreatment.builder();
+
+        if (protocol == IPv4.PROTOCOL_TCP) {
+            outSelector.matchEthType(Ethernet.TYPE_IPV4)
+                        .matchIPProtocol(IPv4.PROTOCOL_TCP)
+                        .matchTcpSrc(TpPort.tpPort(srcPort))
+                        .matchIPSrc(IpPrefix.valueOf(srcIP, 32));
+
+            outTreatment//.setIpSrc(interfaceAddr)
+                    //.setTcpSrc(TpPort.tpPort(outTranslationPair.getTpPort()))
+                    .setOutput(PortNumber.fromString("2"));
+
+            inSelector.matchEthType(Ethernet.TYPE_IPV4)
+                    .matchIPProtocol(IPv4.PROTOCOL_TCP)
+                    .matchTcpDst(TpPort.tpPort(outTranslationPair.getTpPort()))
+                    .matchIPDst(IpPrefix.valueOf(interfaceAddr, 32));
+
+            inTreatment//.setIpDst(srcIP)
+                    //.setTcpDst(TpPort.tpPort(srcPort))
+                    .setOutput(PortNumber.fromString("1"));
+        } /*else if (protocol == IPv4.PROTOCOL_UDP) {
+            outSelector.matchUdpSrc(TpPort.tpPort(inTranslationPair.getTpPort()))
+                    .matchIPSrc(IpPrefix.valueOf(inTranslationPair.getIpAddress(), 32));
+
+            outTreatment.setIpSrc(outTranslationPair.getIpAddress())
+                    .setUdpSrc(TpPort.tpPort(outTranslationPair.getTpPort()));
+
+            inSelector.matchUdpSrc(TpPort.tpPort(outTranslationPair.getTpPort()))
+                    .matchIPSrc(IpPrefix.valueOf(outTranslationPair.getIpAddress(), 32));
+
+            inTreatment.setIpSrc(inTranslationPair.getIpAddress())
+                    .setUdpSrc(TpPort.tpPort(inTranslationPair.getTpPort()));
+        } else {
+            //What to do?
+            //TODO
+        }*/
+
+        FlowRule inFlowRule = DefaultFlowRule.builder()
+                .forDevice(mainSwitch)
+                .fromApp(appId)
+                .withSelector(inSelector.build())
+                .withTreatment(inTreatment.build())
+                //10 Sec?
+                .withIdleTimeout(10000)
+                .withPriority(50000)
+                .build();
+
+        FlowRule outFlowRule = DefaultFlowRule.builder()
+                .forDevice(mainSwitch)
+                .fromApp(appId)
+                .withSelector(outSelector.build())
+                .withTreatment(outTreatment.build())
+                //10 Sec?
+                .withIdleTimeout(10000)
+                .withPriority(50000)
+                .build();
+        FlowRule[] result = {inFlowRule, outFlowRule};
+        return result;
+
+
+    }
+
+    public void addInterfaceTable(String name, IpAddress publicIp, PortNumber portNumber) {
+        interfaceTableMap.put(name, new InterfaceTable(name, publicIp, portNumber));
+    }
+
+    private void installEchoRule(Host host, IpAddress ipDst, String netInterface, ApplicationId appId) {
+
+        InterfaceTable interfaceTable = interfaceTableMap.get(netInterface);
+
+
+        interfaceTable.addEchoEntry(host, ipDst);
+
+        Set<IpAddress> hostIps = host.ipAddresses();
+
+        if (!hostIps.isEmpty()) {
+            // Maybe should loop over set and apply to all Ips instead of taking the first one
+            IpAddress hostIp = (IpAddress) hostIps.toArray()[0];
+
+            // Select all echo request ICMP packets that match the destination ip and local host ip
+            TrafficSelector reqSelector = DefaultTrafficSelector.builder()
+                    .matchEthType(Ethernet.TYPE_IPV4)
+                    .matchIPProtocol(IPv4.PROTOCOL_ICMP)
+                    .matchIcmpType(ICMP.TYPE_ECHO_REQUEST)
+                    .matchIPDst(ipDst.toIpPrefix())
+                    .matchIPSrc(hostIp.toIpPrefix())
+                    .build();
+
+            TrafficTreatment reqTreatment = DefaultTrafficTreatment.builder()
+                    .setIpSrc(interfaceTable.ip)
+                    .setOutput(interfaceTable.portNumber)
+                    .build();
+
+            flowObjectiveService.forward(mainSwitch, DefaultForwardingObjective.builder()
+                    .fromApp(appId)
+                    .withSelector(reqSelector)
+                    .withTreatment(reqTreatment)
+                    .add());
+
+
+            // Select all echo reply ICMP packets that match the source ip
+            TrafficSelector replySelector = DefaultTrafficSelector.builder()
+                    .matchEthType(Ethernet.TYPE_IPV4)
+                    .matchIPProtocol(IPv4.PROTOCOL_ICMP)
+                    .matchIcmpType(ICMP.TYPE_ECHO_REPLY)
+                    .matchIPSrc(ipDst.toIpPrefix())
+                    .build();
+
+            TrafficTreatment replyTreatment = DefaultTrafficTreatment.builder()
+                    .setIpDst(hostIp)
+                    .setEthDst(host.mac())
+                    .build();
+
+            flowObjectiveService.forward(mainSwitch, DefaultForwardingObjective.builder()
+                    .fromApp(appId)
+                    .withSelector(replySelector)
+                    .withTreatment(replyTreatment)
+                    .add());
+
+        }
+
+    }
+
+    private class InterfaceTable {
+
+
+        final private String name;
+        final private IpAddress ip;
+        final private PortNumber portNumber;
+
+        // The current port number being used as the new src port
+        // TODO maybe just store as an int
+        private TpPort currentPort;
+
+
+        // Maps the new src port to the pair of local ip and old src port
+        Map<TpPort, AbstractMap.SimpleImmutableEntry<Host, TpPort>> flowMap;
+
+        // Maps the (outgoing) destination ip of a ping packet to a host within the WAN
+        Map<IpAddress, Host> echoMap;
+
+        // TODO add support for ping packets (IMCP echo request/ reply)
+
+        public InterfaceTable(String name, IpAddress ip, PortNumber portNumber) {
+            this.name = name;
+            this.ip = ip;
+            this.portNumber = portNumber;
+
+            // Set current tp port number to 0
+            currentPort = TpPort.tpPort(TpPort.MIN_PORT);
+        }
+
+
+        public TpPort nextPort() {
+            return currentPort.toInt() >= TpPort.MAX_PORT ? null : TpPort.tpPort(currentPort.toInt() + 1);
+        }
+
+
+        public void addEntry(Host host, TpPort oldSrcPort, TpPort newSrcPort) {
+            flowMap.put(newSrcPort, new AbstractMap.SimpleImmutableEntry<>(host, oldSrcPort));
+            currentPort = TpPort.tpPort(currentPort.toInt() + 1);
+        }
+
+        public void addEntry(Host host, IpAddress ipDst) {
+
+        }
+
+        public void removeEntry(TpPort newSrcPort) {
+            flowMap.remove(newSrcPort);
+            currentPort = TpPort.tpPort(currentPort.toInt() - 1);
+        }
+
+        public AbstractMap.SimpleImmutableEntry getEntry(TpPort newSrcPort) {
+            return flowMap.get(newSrcPort);
+        }
+
+
+        public void addEchoEntry(Host host, IpAddress ipDst) {
+            echoMap.put(ipDst, host);
+        }
+
+
+    }
+
+    private class NatAddrPortPair {
+        IpAddress ipAddr;
+        int tpPort;
+        byte protocol;
+
+	    public NatAddrPortPair(IpAddress ipAddr, int tpPort, byte protocol){
+        this.ipAddr = ipAddr;
+        this.tpPort = tpPort;
+        this.protocol = protocol;
+    }
+
+    public int getTpPort() {
+        return tpPort;
+    }
+
+    public void setTpPort(int tpPort) {
+        this.tpPort = tpPort;
+    }
+
+    public IpAddress getIpAddress() {
+        return ipAddr;
+    }
+
+    public void setIpAddress() {
+        this.ipAddr = ipAddr;
+    }
+
+    public byte getProtocol() {
+        return protocol;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof NatAddrPortPair) {
+            if (((NatAddrPortPair) o).getIpAddress() == ipAddr && ((NatAddrPortPair) o).getTpPort() == tpPort) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = ipAddr.hashCode();
+        result = 31 * result + tpPort;
+        return result;
+    }
+
+}
+}
+
+
